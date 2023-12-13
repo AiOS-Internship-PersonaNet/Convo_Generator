@@ -8,7 +8,6 @@ import re
 from langchain.chains import LLMChain
 from langchain.llms import OpenAI
 from langchain.prompts import StringPromptTemplate
-from langchain.utilities import SerpAPIWrapper    
 from typing import List
 from langchain.agents.format_scratchpad import format_to_openai_function_messages
 from langchain.schema.agent import AgentFinish
@@ -19,9 +18,10 @@ from langchain.schema import Document
 from langchain.vectorstores import FAISS
 from langchain.agents import AgentType, Tool, initialize_agent
 from langchain.tools import StructuredTool
+from apikey import apikey
+from langchain.tools import DuckDuckGoSearchRun, E2BDataAnalysisTool
 import re
 from typing import Union
-
 from langchain.agents import (
     AgentExecutor,
     AgentOutputParser,
@@ -30,13 +30,13 @@ from langchain.agents import (
 )
 from langchain.chains import LLMChain
 from langchain.llms import OpenAI
-from langchain.prompts import StringPromptTemplate
+from langchain.prompts import StringPromptTemplate, PromptTemplate
 from langchain.schema import AgentAction, AgentFinish
-from langchain.utilities import SerpAPIWrapper
+from langchain.agents.openai_assistant import OpenAIAssistantRunnable
 
-search = SerpAPIWrapper()
+ALL_TOOLS = [DuckDuckGoSearchRun()]
 
-
+import os
 # def update_conversation(intermediate_steps : List[tuple[str,str]] , new_user_1_response : str, new_user_2_response : str):
 #     """
 #     Updates the state of the conversation with new responses.
@@ -60,24 +60,12 @@ search = SerpAPIWrapper()
 
 # convo_tool = StructuredTool.from_function(update_conversation)
 
-search_tool = Tool(
-        name = "Search",
-        func = search.run,
-        description= "useful for when you need to present a conversation topic on current events"
-    )
-    # ),
-    # Tool(
-    #     name = "UpdateConversation",
-    #     func = update_conversation,
-    #     description= "updates the state of the conversation with new responses"
 
-    # )
-ALL_TOOLS = [search_tool]
 docs = [
     Document(page_content=t.description, metadata={"index": i})
     for i, t in enumerate(ALL_TOOLS)
 ]
-vector_store = FAISS.from_documents(docs, OpenAIEmbeddings())
+vector_store = FAISS.from_documents(docs, OpenAIEmbeddings(openai_api_key=apikey))
 retriever = vector_store.as_retriever()
 
 
@@ -194,11 +182,7 @@ class ConvoPromptTemplate(StringPromptTemplate):
 
       
          
-prompt = ConvoPromptTemplate(
-    template=template,
-    tools_getter= get_tools,
-    input_variables=["user_1", "user_2","intermediate_steps"],
-)
+
 
 from typing import Optional, Union
 class CustomOutputParser(AgentOutputParser):
@@ -315,61 +299,55 @@ class CustomOutputParser(AgentOutputParser):
 
 outputParser = CustomOutputParser()
 
-llm = OpenAI(temperature = 0.9)
-
-llm_chain = LLMChain(llm = llm, prompt=prompt)
+llm = OpenAI(temperature = 0.9, max_tokens=-1)
+prompt = ConvoPromptTemplate(
+    template=template,
+    tools_getter= get_tools,
+    input_variables=["user_1", "user_2","intermediate_steps"],
+)
+# prompt = PromptTemplate.from_template(
+#     input_variables=["user_1", "user_2", "agent_scratchpad", "tool_names", "tools"],
+#     template=template,
+# )
+llm_chain = LLMChain(llm = llm, prompt=prompt, verbose=True)
 
 tool_names = [tool.name for tool in ALL_TOOLS]
 
-agent = LLMSingleActionAgent(
-llm_chain=llm_chain,
-output_parser=outputParser,
-stop=["\nObservation:"],
-allowed_tools = tool_names
 
+# agent = LLMSingleActionAgent(
+# llm_chain=llm_chain,
+# output_parser=outputParser,
+# stop=["\nObservation:"],
+# allowed_tools = tool_names
+# )
+agent = OpenAIAssistantRunnable.create_assistant(
+    name="langchain assistant tool",
+    instructions="You are a conversation generator. Write and run code that uses two personas and makes a conversation using both these personas",
+    tools=ALL_TOOLS,
+    stop=["\nObservation:"],
+    output_parser=outputParser,
+    model="gpt-4-1106-preview",
+    as_agent=True,
 )
 
 from langchain.schema.agent import AgentFinish
 from langchain.agents import AgentExecutor
 
-# docs = [
-#     Document(page_content=t.description, metadata={"index": i})
-#     for i, t in enumerate(tools)
-# ]
-# vector_store = FAISS.from_documents(docs, OpenAIEmbeddings())
-# retriever = vector_store.as_retriever()
-
-
-# def get_tools(query):
-#     docs = retriever.get_relevant_documents(query)
-#     return [tools[d.metadata["index"]] for d in docs]
 
 intermediate_steps = []
 user_1 =  "Office worker that loves to polay video games, on his days off he enjoys watching anime"
 user_2 = "Teacher that loves to do art in free time. Always up to date on politics"
 agent_executor = AgentExecutor.from_agent_and_tools(agent=agent, tools=ALL_TOOLS,handle_parsing_errors=True, verbose = True)
-conversation = agent_executor.run(prompt = prompt, user_1= user_1, user_2 = user_2)
+# conversation = agent_executor.run(prompt = prompt, user_1= user_1, user_2 = user_2)
+out = llm_chain.run(user_1=user_1, user_2=user_2, intermediate_steps="")
+conversation = agent_executor.invoke({"content": out})
+print(type(out))
+print(out)
+print("--------------------------")
 print(conversation)
-# while True:
-#     current_prompt = prompt.format(user_1 = user_1, user_2 = user_2, intermediate_steps = intermediate_steps)
 
-#     response,get_tools =  agent_executor.run(prompt = current_prompt, user_1 = user_1, user_2 = user_2)
+# print(conversation)
 
-#     if get_tools == "UpdateConversation":
-
-        
-
-#         intermediate_steps = update_conversation(
-#             intermediate_steps,
-#             ["User_1_response"],
-#             ["User_2_response"]
-            
-#         )
-
-#         if len(intermediate_steps) >=8:
-#             break
-# final_conversation = final_conversation = "\n".join([f"{step[0]} {step[1]}" for step in intermediate_steps])
-# print("Final Conversation:" , final_conversation)
 
 
 
