@@ -1,17 +1,16 @@
-const { LLMSingleActionAgent, AgentExecutor } = require('langchain/agents');
-const { AgentAction, AgentFinish } = require('langchain/schema');
-const { Document } = require('langchain/schema/document');
-const { FAISS } = require('langchain/vectorstores');
-const { OpenAIEmbeddings } = require('langchain/embeddings');
-const { StringPromptTemplate } = require('langchain/schema');
-const { StructuredTool } = require('langchain/tools');
-const { OpenAI } = require("langchain/llms/openai");
-const { SerpAPI } =  require("langchain/tools");
+// import { apikey } from "./apikey.js"
 
+import { LLMSingleActionAgent, AgentExecutor } from "langchain/agents";
+import { AgentAction, AgentFinish } from "langchain/schema";
+import { Document } from "langchain/dist/document.js";
+import { FAISS } from "langchain/vectorstores";
+import { OpenAIEmbeddings } from "langchain/embeddings";
+import { StructuredTool } from "langchain/tools";
+import { OpenAI } from "langchain/llms/openai";
+import { BraveSearch } from "langchain/tools";
 // For OpenAI, you might need to check the specific path for import in the package
 // It should be something similar to this
-const { OpenAI } = require('langchain/llms/openai');
-search = SerpAPI()
+search = BraveSearch()
 class SearchTool extends StructuredTool {
     constructor() {
         super({

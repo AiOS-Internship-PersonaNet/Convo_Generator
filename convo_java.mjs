@@ -5,8 +5,9 @@ import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
 import { PromptTemplate } from 'langchain/prompts'; // Updated import for PromptTemplate
 import { StructuredTool } from 'langchain/tools';
 import { OpenAI } from 'langchain/llms/openai';
-import { SerpAPI } from 'langchain/tools';
+import { BraveSearch } from 'langchain/tools';
 
+const apikey = "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"
 class SearchTool extends StructuredTool {
     constructor() {
         super({
@@ -21,7 +22,7 @@ class SearchTool extends StructuredTool {
 }
 
 // Initialize SerpAPI tool
-const search = new SerpAPI();
+// const search = new SerpAPI();
 const searchTool = new SearchTool();
 
 // Define tools
@@ -33,8 +34,8 @@ const docs = tools.map((tool, index) => new Document({ pageContent: tool.descrip
 
 
 // Initialize FaissStore with documents and embeddings
-const vectorStore = new FaissStore(new OpenAIEmbeddings(), {});
-await vectorStore.addDocuments(docs);
+const vectorStore = new FaissStore(new OpenAIEmbeddings({openAIApiKey: apikey}), {});
+// await vectorStore.addDocuments(docs);
 
 // Function to retrieve relevant tools based on a query
 async function getTools(query) {
@@ -43,8 +44,9 @@ async function getTools(query) {
 }
 
 class ConvoPromptTemplate extends PromptTemplate { // Updated base class
-    constructor(template, toolsGetter) {
-        super({ template }); // Updated constructor call
+    constructor(template, inputVariables, toolsGetter) {
+        super( inputVariables, template ); // Updated constructor call
+        // super( inputVariables );
         this.toolsGetter = toolsGetter;
     }
 
@@ -74,7 +76,7 @@ class ConvoPromptTemplate extends PromptTemplate { // Updated base class
 }
 
 // Initialize the components
-const llm = new OpenAI({ temperature: 0.9 });
+const llm = new OpenAI({ temperature: 0.9, openAIApiKey: apikey });
 const template = `Given the two user's data that includes interests and traits, find a current discussion topic and create a 16 sentence discussion between the two users using realistic emotional language. These are the tools available to you:
 {tools}
 
@@ -102,7 +104,9 @@ Begin! Remember to have the personalities of each user in mind when giving your 
 User_1 = {user_1}
 User_2 = {user_2}
 {agent_scratchpad}`; // Your template string here
-const promptTemplate = new ConvoPromptTemplate(template, getTools);
+
+const inputVariables = ["user_1", "user_2",];
+const promptTemplate = new ConvoPromptTemplate(template, inputVariables, getTools);
 
 // Define the agent
 const agent = new LLMSingleActionAgent({

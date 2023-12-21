@@ -29,7 +29,6 @@ from langchain.agents import (
     Tool,
 )
 from langchain.chains import LLMChain
-from langchain.llms import OpenAI
 from langchain.prompts import StringPromptTemplate, PromptTemplate
 from langchain.schema import AgentAction, AgentFinish
 from langchain.agents.openai_assistant import OpenAIAssistantRunnable
@@ -37,6 +36,7 @@ from langchain.agents.openai_assistant import OpenAIAssistantRunnable
 ALL_TOOLS = [DuckDuckGoSearchRun()]
 
 import os
+os.environ['OPENAI_API_KEY'] = "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"
 # def update_conversation(intermediate_steps : List[tuple[str,str]] , new_user_1_response : str, new_user_2_response : str):
 #     """
 #     Updates the state of the conversation with new responses.
