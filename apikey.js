@@ -1,1 +1,1 @@
-export const apikey = "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"
+export const apikey = "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"

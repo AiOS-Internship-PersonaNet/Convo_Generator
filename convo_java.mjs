@@ -1,13 +1,28 @@
 import { LLMSingleActionAgent, AgentExecutor } from 'langchain/agents';
+import { LLMChain } from "langchain/chains";
 import { Document } from "langchain/document";
 import { FaissStore } from 'langchain/vectorstores/faiss';
+import { formatLogToString } from "langchain/agents/format_scratchpad/log";
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
+import { ChatOpenAI } from "langchain/chat_models/openai";
 import { PromptTemplate } from 'langchain/prompts'; // Updated import for PromptTemplate
+import { RunnableSequence } from "langchain/schema/runnable";
+import {
+    HumanMessage,
+} from "langchain/schema";
 import { StructuredTool } from 'langchain/tools';
-import { OpenAI } from 'langchain/llms/openai';
-import { BraveSearch } from 'langchain/tools';
+import {
+    WikipediaQueryRun,
+    RequestsGetTool,
+    RequestsPostTool,
+    AIPluginTool,
+} from 'langchain/tools';
 
-const apikey = "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"
+const apikey = "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"
+const model = new ChatOpenAI({ temperature: 0.9, openAIApiKey: apikey }).bind({
+    stop: ["\nObservation"],
+});;
+
 class SearchTool extends StructuredTool {
     constructor() {
         super({
@@ -24,9 +39,14 @@ class SearchTool extends StructuredTool {
 // Initialize SerpAPI tool
 // const search = new SerpAPI();
 const searchTool = new SearchTool();
-
+// const braveSearchTool = new BraveSearchParams()
+const tool = new WikipediaQueryRun()
 // Define tools
-const tools = [searchTool];
+const tools = [new RequestsGetTool(),
+new RequestsPostTool(),
+await AIPluginTool.fromPluginUrl(
+    "https://www.klarna.com/.well-known/ai-plugin.json"
+),];
 
 // Create documents for FAISS vector store
 const docs = tools.map((tool, index) => new Document({ pageContent: tool.description, metadata: { index } }));
@@ -34,7 +54,7 @@ const docs = tools.map((tool, index) => new Document({ pageContent: tool.descrip
 
 
 // Initialize FaissStore with documents and embeddings
-const vectorStore = new FaissStore(new OpenAIEmbeddings({openAIApiKey: apikey}), {});
+const vectorStore = new FaissStore(new OpenAIEmbeddings({ openAIApiKey: apikey }), {});
 // await vectorStore.addDocuments(docs);
 
 // Function to retrieve relevant tools based on a query
@@ -43,44 +63,12 @@ async function getTools(query) {
     return relevantDocs.map(doc => tools[doc.metadata.index]);
 }
 
-class ConvoPromptTemplate extends PromptTemplate { // Updated base class
-    constructor(template, inputVariables, toolsGetter) {
-        super( inputVariables, template ); // Updated constructor call
-        // super( inputVariables );
-        this.toolsGetter = toolsGetter;
-    }
-
-    async format(kwargs) {
-        let thoughts = "";
-        const intermediateSteps = kwargs.intermediateSteps || [];
-        const user1 = kwargs.user1 || "";
-        const user2 = kwargs.user2 || "";
-        const tools = await this.toolsGetter(`${user1} ${user2}`);
-
-        intermediateSteps.forEach(([action, observation]) => {
-            thoughts += `Action: ${action}\nObservation: ${observation}\n`;
-        });
-
-        const toolDescriptions = tools.map(tool => `${tool.name}: ${tool.description}`).join("\n");
-        const toolNames = tools.map(tool => tool.name).join(", ");
-
-        const formattedTemplate = this.template.replace("{tools}", toolDescriptions)
-                            .replace("{tool_names}", toolNames)
-                            .replace("{user_1}", user1)
-                            .replace("{user_2}", user2)
-                            .replace("{agent_scratchpad}", thoughts);
-
-        // Return formatted template
-        return formattedTemplate;
-    }
-}
-
 // Initialize the components
-const llm = new OpenAI({ temperature: 0.9, openAIApiKey: apikey });
-const template = `Given the two user's data that includes interests and traits, find a current discussion topic and create a 16 sentence discussion between the two users using realistic emotional language. These are the tools available to you:
-{tools}
 
-Use the following format:
+const PREFIX = `Given the two user's data that includes interests and traits, find a current discussion topic and create a 16 sentence discussion between the two users using realistic emotional language. These are the tools available to you:
+{tools}`;
+
+const TOOL_INSTRUCTIONS_TEMPLATE = `Use the following format:
 
 Topic: the current discussion topic based on user_1 and user_2 
 Thought: You should always think about what to do 
@@ -98,36 +86,175 @@ Thought: I have User_1's reply to User_2's response
 
 Thought: I now have the conversation 
 Final Conversation: the final conversation based on user_1 and user_2
+`;
 
-Begin! Remember to have the personalities of each user in mind when giving your final conversation.
+const SUFFIX = `Begin! Remember to have the personalities of each user in mind when giving your final conversation.
 
-User_1 = {user_1}
-User_2 = {user_2}
-{agent_scratchpad}`; // Your template string here
-
-const inputVariables = ["user_1", "user_2",];
-const promptTemplate = new ConvoPromptTemplate(template, inputVariables, getTools);
-
-// Define the agent
-const agent = new LLMSingleActionAgent({
-    llmChain: llm,
-    promptTemplate: promptTemplate,
-    tools: tools
-});
-
-// Run the agent executor
-async function runAgentExecutor(user1, user2) {
-    const intermediateSteps = [];
-    const agentExecutor = new AgentExecutor({
-        agent,
-        tools,
-        handleParsingErrors: true,
-        verbose: true
+Users: {input}
+Thought:`;
+async function formatMessages(
+    values
+) {
+    /** Check input and intermediate steps are both inside values */
+    if (!("input" in values) || !("intermediate_steps" in values)) {
+        throw new Error("Missing input or agent_scratchpad from values.");
+    }
+    /** Extract and case the intermediateSteps from values as Array<AgentStep> or an empty array if none are passed */
+    const intermediateSteps = values.intermediate_steps
+        ? (values.intermediate_steps)
+        : [];
+    /** Call the helper `formatLogToString` which returns the steps as a string  */
+    const agentScratchpad = formatLogToString(intermediateSteps);
+    /** Construct the tool strings */
+    const toolStrings = tools
+        .map((tool) => `${tool.name}: ${tool.description}`)
+        .join("\n");
+    const toolNames = tools.map((tool) => tool.name).join(",\n");
+    /** Create templates and format the instructions and suffix prompts */
+    const prefixTemplate = new PromptTemplate({
+        template: PREFIX,
+        inputVariables: ["tools"],
     });
-
-    const conversation = await agentExecutor.run({ user1, user2, intermediateSteps });
-    console.log(conversation);
+    const instructionsTemplate = new PromptTemplate({
+        template: TOOL_INSTRUCTIONS_TEMPLATE,
+        inputVariables: ["tool_names"],
+    });
+    const suffixTemplate = new PromptTemplate({
+        template: SUFFIX,
+        inputVariables: ["input"],
+    });
+    /** Format both templates by passing in the input variables */
+    const formattedPrefix = await prefixTemplate.format({
+        tools: toolStrings,
+    });
+    const formattedInstructions = await instructionsTemplate.format({
+        tool_names: toolNames,
+    });
+    const formattedSuffix = await suffixTemplate.format({
+        input: values.input,
+    });
+    /** Construct the final prompt string */
+    const formatted = [
+        formattedPrefix,
+        formattedInstructions,
+        formattedSuffix,
+        agentScratchpad,
+    ].join("\n");
+    /** Return the message as a HumanMessage. */
+    return [new HumanMessage(formatted)];
 }
 
-// Example usage
-runAgentExecutor("User1", "User2");
+// function customOutputParser(message) {
+//     // Implement the logic for parsing LLM output
+//     const llmOutput = message.content;
+//     const observationMatch = llmOutput.match(/Observation:(.*)/s);
+//     if (observationMatch) {
+//         return new AgentStep({
+//             returnValues: { output: observationMatch[1].trim() },
+//             log: llmOutput
+//         });
+//     }
+
+//     const finalConversationMatch = llmOutput.match(/Final Conversation:(.*)/s);
+//     if (finalConversationMatch) {
+//         return new AgentStep({
+//             returnValues: { output: finalConversationMatch[1].trim() },
+//             log: llmOutput
+//         });
+//     }
+
+//     const actionMatch = llmOutput.match(/Action\s*:(.*?)\nAction\s*Input\s*:(.*)/s);
+//     if (actionMatch) {
+//         this.lastAction = actionMatch[1].trim();
+//         this.lastActionInput = actionMatch[2].trim();
+//         return new AgentStep({ tool: this.lastAction, toolInput: this.lastActionInput, log: llmOutput });
+//     }
+
+// }
+function customOutputParser(message) {
+    const text = message.content;
+    if (typeof text !== "string") {
+        throw new Error(
+            `Message content is not a string. Received: ${JSON.stringify(
+                text,
+                null,
+                2
+            )}`
+        );
+    }
+    const observationMatch = text.match(/Observation:(.*)/s);
+    if (observationMatch) {
+        return {
+            returnValues: { output: observationMatch[1].trim() },
+            log: text,
+        };;
+    }
+    /** If the input includes "Final Answer" return as an instance of `AgentFinish` */
+    if (text.includes("Final Conversation:")) {
+        const parts = text.split("Final Conversation:");
+        const input = parts[parts.length - 1].trim();
+        const finalAnswers = { output: input };
+        return { log: text, returnValues: finalAnswers };
+    }
+    /** Use RegEx to extract any actions and their values */
+    const match = text.match(/Action\s*:(.*?)\nAction\s*Input\s*:(.*)/s);
+
+    // if (!match) {
+    //     throw new Error(`Could not parse LLM output: ${text}`);
+    // }
+    /** Return as an instance of `AgentAction` */
+    if (match) {
+        return {
+            tool: match[1].trim(),
+            toolInput: match[2].trim(),
+            log: text
+        };
+    }
+}
+
+
+const runnable = RunnableSequence.from([
+    {
+        input: (values) => values.input,
+        intermediate_steps: (values) => values.steps,
+    },
+    formatMessages,
+    model,
+    customOutputParser,
+]);
+
+const executor = new AgentExecutor({
+    agent: runnable,
+    tools,
+    verbose: true,
+});
+const input = `User_1: Office worker that loves to play video games, on his days off he enjoys watching anime
+User_2: Teacher that loves to do art in free time. Always up to date on politics`
+const result = await executor.invoke({ input });
+
+// Define the agent
+// const llmChain = new LLMChain({ model, prompt: TOOL_INSTRUCTIONS_TEMPLATE, customOutputParser, formatMessages });
+
+// const agent = new LLMSingleActionAgent({
+//     llmChain: llmChain,
+//     stop: ["\nObservation:"],
+//     // promptTemplate: promptTemplate,
+//     tools: tools
+// });
+
+// // Run the agent executor
+// async function runAgentExecutor(user1, user2) {
+//     const intermediateSteps = [];
+//     const agentExecutor = new AgentExecutor({
+//         agent: agent,
+//         tools,
+//         handleParsingErrors: true,
+//         verbose: true
+//     });
+
+//     const conversation = await agentExecutor.invoke({ input });
+//     console.log(conversation);
+// }
+
+// // Example usage
+// runAgentExecutor("User1", "User2");
