@@ -5,8 +5,10 @@ import { FaissStore } from 'langchain/vectorstores/faiss';
 import { formatLogToString } from "langchain/agents/format_scratchpad/log";
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
 import { ChatOpenAI } from "langchain/chat_models/openai";
+import { OpenAIAssistantRunnable } from "langchain/experimental/openai_assistant";
 import { PromptTemplate } from 'langchain/prompts'; // Updated import for PromptTemplate
 import { RunnableSequence } from "langchain/schema/runnable";
+
 import {
     HumanMessage,
 } from "langchain/schema";
@@ -18,7 +20,7 @@ import {
     AIPluginTool,
 } from 'langchain/tools';
 
-const apikey = "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"
+const apikey = "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"
 const model = new ChatOpenAI({ temperature: 0.9, openAIApiKey: apikey }).bind({
     stop: ["\nObservation"],
 });;
@@ -36,12 +38,9 @@ class SearchTool extends StructuredTool {
     }
 }
 
-// Initialize SerpAPI tool
-// const search = new SerpAPI();
+// Define tools
 const searchTool = new SearchTool();
 // const braveSearchTool = new BraveSearchParams()
-const tool = new WikipediaQueryRun()
-// Define tools
 const tools = [new RequestsGetTool(),
 new RequestsPostTool(),
 await AIPluginTool.fromPluginUrl(
@@ -144,33 +143,6 @@ async function formatMessages(
     return [new HumanMessage(formatted)];
 }
 
-// function customOutputParser(message) {
-//     // Implement the logic for parsing LLM output
-//     const llmOutput = message.content;
-//     const observationMatch = llmOutput.match(/Observation:(.*)/s);
-//     if (observationMatch) {
-//         return new AgentStep({
-//             returnValues: { output: observationMatch[1].trim() },
-//             log: llmOutput
-//         });
-//     }
-
-//     const finalConversationMatch = llmOutput.match(/Final Conversation:(.*)/s);
-//     if (finalConversationMatch) {
-//         return new AgentStep({
-//             returnValues: { output: finalConversationMatch[1].trim() },
-//             log: llmOutput
-//         });
-//     }
-
-//     const actionMatch = llmOutput.match(/Action\s*:(.*?)\nAction\s*Input\s*:(.*)/s);
-//     if (actionMatch) {
-//         this.lastAction = actionMatch[1].trim();
-//         this.lastActionInput = actionMatch[2].trim();
-//         return new AgentStep({ tool: this.lastAction, toolInput: this.lastActionInput, log: llmOutput });
-//     }
-
-// }
 function customOutputParser(message) {
     const text = message.content;
     if (typeof text !== "string") {
@@ -213,48 +185,30 @@ function customOutputParser(message) {
 }
 
 
-const runnable = RunnableSequence.from([
-    {
-        input: (values) => values.input,
-        intermediate_steps: (values) => values.steps,
-    },
-    formatMessages,
-    model,
-    customOutputParser,
-]);
+// const runnable = RunnableSequence.from([
+//     {
+//         input: (values) => values.input,
+//         intermediate_steps: (values) => values.steps,
+//     },
+//     formatMessages,
+//     model,
+//     customOutputParser,
+// ]);
 
-const executor = new AgentExecutor({
-    agent: runnable,
-    tools,
-    verbose: true,
+// const agentExecutor = new AgentExecutor({
+//     agent: runnable,
+//     tools,
+//     verbose: true,
+// });
+const agentExecutor = await OpenAIAssistantRunnable.createAssistant({
+    clientOptions: { apiKey: apikey },
+    model,
+    formatMessages,
+    customOutputParser,
 });
+
 const input = `User_1: Office worker that loves to play video games, on his days off he enjoys watching anime
 User_2: Teacher that loves to do art in free time. Always up to date on politics`
-const result = await executor.invoke({ input });
+const result = await agentExecutor.invoke({ input });
+console.log(result  );
 
-// Define the agent
-// const llmChain = new LLMChain({ model, prompt: TOOL_INSTRUCTIONS_TEMPLATE, customOutputParser, formatMessages });
-
-// const agent = new LLMSingleActionAgent({
-//     llmChain: llmChain,
-//     stop: ["\nObservation:"],
-//     // promptTemplate: promptTemplate,
-//     tools: tools
-// });
-
-// // Run the agent executor
-// async function runAgentExecutor(user1, user2) {
-//     const intermediateSteps = [];
-//     const agentExecutor = new AgentExecutor({
-//         agent: agent,
-//         tools,
-//         handleParsingErrors: true,
-//         verbose: true
-//     });
-
-//     const conversation = await agentExecutor.invoke({ input });
-//     console.log(conversation);
-// }
-
-// // Example usage
-// runAgentExecutor("User1", "User2");
