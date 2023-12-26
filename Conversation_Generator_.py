@@ -314,12 +314,12 @@ llm_chain = LLMChain(llm = llm, prompt=prompt, verbose=True)
 tool_names = [tool.name for tool in ALL_TOOLS]
 
 
-# agent = LLMSingleActionAgent(
-# llm_chain=llm_chain,
-# output_parser=outputParser,
-# stop=["\nObservation:"],
-# allowed_tools = tool_names
-# )
+agent = LLMSingleActionAgent(
+llm_chain=llm_chain,
+output_parser=outputParser,
+stop=["\nObservation:"],
+allowed_tools = tool_names
+)
 agent = OpenAIAssistantRunnable.create_assistant(
     name="langchain assistant tool",
     instructions="You are a conversation generator. Write and run code that uses two personas and makes a conversation using both these personas",

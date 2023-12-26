@@ -1,5 +1,4 @@
 import { LLMSingleActionAgent, AgentExecutor } from 'langchain/agents';
-import { LLMChain } from "langchain/chains";
 import { Document } from "langchain/document";
 import { FaissStore } from 'langchain/vectorstores/faiss';
 import { formatLogToString } from "langchain/agents/format_scratchpad/log";
@@ -12,7 +11,7 @@ import { RunnableSequence } from "langchain/schema/runnable";
 import {
     HumanMessage,
 } from "langchain/schema";
-import { StructuredTool } from 'langchain/tools';
+import { BraveSearch, StructuredTool, SerpAPI } from 'langchain/tools';
 import {
     WikipediaQueryRun,
     RequestsGetTool,
@@ -20,7 +19,7 @@ import {
     AIPluginTool,
 } from 'langchain/tools';
 
-const apikey = "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"
+const apikey = "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"
 const model = new ChatOpenAI({ temperature: 0.9, openAIApiKey: apikey }).bind({
     stop: ["\nObservation"],
 });;
@@ -40,12 +39,15 @@ class SearchTool extends StructuredTool {
 
 // Define tools
 const searchTool = new SearchTool();
-// const braveSearchTool = new BraveSearchParams()
-const tools = [new RequestsGetTool(),
-new RequestsPostTool(),
-await AIPluginTool.fromPluginUrl(
-    "https://www.klarna.com/.well-known/ai-plugin.json"
-),];
+// const braveSearchTool = new BraveSearch(BRAVE_SEARCH_API_KEY: )
+const serpAPITool = new SerpAPI("af50c8c9e2d408b3256e8a1c316da119da0c4e16dcf05e07a560181de5f4f951")
+const tools = [
+// new RequestsGetTool(),
+// new RequestsPostTool(),
+// await AIPluginTool.fromPluginUrl(
+//     "https://www.klarna.com/.well-known/ai-plugin.json"
+// ),
+serpAPITool];
 
 // Create documents for FAISS vector store
 const docs = tools.map((tool, index) => new Document({ pageContent: tool.description, metadata: { index } }));
@@ -171,10 +173,6 @@ function customOutputParser(message) {
     /** Use RegEx to extract any actions and their values */
     const match = text.match(/Action\s*:(.*?)\nAction\s*Input\s*:(.*)/s);
 
-    // if (!match) {
-    //     throw new Error(`Could not parse LLM output: ${text}`);
-    // }
-    /** Return as an instance of `AgentAction` */
     if (match) {
         return {
             tool: match[1].trim(),
@@ -200,15 +198,26 @@ function customOutputParser(message) {
 //     tools,
 //     verbose: true,
 // });
-const agentExecutor = await OpenAIAssistantRunnable.createAssistant({
+
+const agent = await OpenAIAssistantRunnable.createAssistant({
     clientOptions: { apiKey: apikey },
-    model,
+    model: "gpt-3.5-turbo-1106",
+    instructions:
+        "Given the two user's data that includes interests and traits, find a current discussion topic and create a 16 sentense discussion between the two users using realistic emotional language. These are the tools available to you",
+        
+    name: "Conversation Generator",
+    tools,
+    asAgent: true,
     formatMessages,
-    customOutputParser,
+    // customOutputParser
+});
+const agentExecutor = AgentExecutor.fromAgentAndTools({
+    agent,
+    tools,
 });
 
 const input = `User_1: Office worker that loves to play video games, on his days off he enjoys watching anime
 User_2: Teacher that loves to do art in free time. Always up to date on politics`
-const result = await agentExecutor.invoke({ input });
-console.log(result  );
+const result = await agentExecutor.invoke({ content: input, });
+console.log(result);
 
