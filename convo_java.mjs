@@ -11,43 +11,59 @@ import { RunnableSequence } from "langchain/schema/runnable";
 import {
     HumanMessage,
 } from "langchain/schema";
-import { BraveSearch, StructuredTool, SerpAPI } from 'langchain/tools';
 import {
-    WikipediaQueryRun,
+    BraveSearch,
+    StructuredTool,
     RequestsGetTool,
     RequestsPostTool,
     AIPluginTool,
+    SerpAPI,
+    DynamicTool,
 } from 'langchain/tools';
 
-const apikey = "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"
+const apikey = "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"
 const model = new ChatOpenAI({ temperature: 0.9, openAIApiKey: apikey }).bind({
     stop: ["\nObservation"],
 });;
 
-class SearchTool extends StructuredTool {
-    constructor() {
-        super({
-            name: 'Search',
-            func: async (input) => {
-                // Implement search functionality here, using SerpAPI for example
-                return await search(input);
-            },
-            description: 'Useful for when you need to present a conversation topic on current events'
-        });
-    }
-}
+// class SearchTool extends StructuredTool {
+//     constructor() {
+//         super({
+//             name: 'Search',
+//             func: async (input) => {
+//                 // Implement search functionality here, using SerpAPI for example
+//                 return await search(input);
+//             },
+//             description: 'Useful for when you need to present a conversation topic on current events'
+//         });
+//     }
+// }
 
 // Define tools
-const searchTool = new SearchTool();
-// const braveSearchTool = new BraveSearch(BRAVE_SEARCH_API_KEY: )
 const serpAPITool = new SerpAPI("af50c8c9e2d408b3256e8a1c316da119da0c4e16dcf05e07a560181de5f4f951")
+const searchTool = new DynamicTool({
+    name: "duckduckgo tool",
+    description: "Tool for getting the latest information from duckduckgo api",
+    func: async (query) => {
+        const settings = {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        };
+        const q = `https://serpapi.com/search?engine=duckduckgo`;
+        // https://serpapi.com/search?engine=duckduckgo
+        const res = await fetch(q, settings)
+            .then(function (response) {
+                return response.json()
+            }).catch(console.log)
+        return res;
+    },
+});
+
 const tools = [
-// new RequestsGetTool(),
-// new RequestsPostTool(),
-// await AIPluginTool.fromPluginUrl(
-//     "https://www.klarna.com/.well-known/ai-plugin.json"
-// ),
-serpAPITool];
+    searchTool,
+    serpAPITool,
+
+];
 
 // Create documents for FAISS vector store
 const docs = tools.map((tool, index) => new Document({ pageContent: tool.description, metadata: { index } }));
@@ -204,10 +220,11 @@ const agent = await OpenAIAssistantRunnable.createAssistant({
     model: "gpt-3.5-turbo-1106",
     instructions:
         "Given the two user's data that includes interests and traits, find a current discussion topic and create a 16 sentense discussion between the two users using realistic emotional language. These are the tools available to you",
-        
+
     name: "Conversation Generator",
     tools,
     asAgent: true,
+    verbose: true,
     formatMessages,
     // customOutputParser
 });
