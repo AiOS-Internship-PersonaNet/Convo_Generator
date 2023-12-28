@@ -1,9 +1,10 @@
 // Initialize the components
+import { PromptTemplate } from 'langchain/prompts'; // Updated import for PromptTemplate
 
-export const PREFIX = `Given the two user's data that includes interests and traits, find a current discussion topic and create a 16 sentence discussion between the two users using realistic emotional language. These are the tools available to you:
-{tools}`;
+const template = `Given the two user's data that includes interests and traits, find a current discussion topic and create a 16 sentense discussion between the two users using realistic emotional language. These are the tools available to you:
+{tools}
 
-export const TOOL_INSTRUCTIONS_TEMPLATE = `Use the following format:
+Use the following format:
 
 Topic: the current discussion topic based on user_1 and user_2 
 Thought: You should always think about what to do 
@@ -16,14 +17,19 @@ Thought: I have User_1's conversation starter
 User_2 Response: imitate User_2 reply to User_1's Conversation starter
 Thought: I have User_2's reply to User_1's response
 User_1 Response: imitate User_1 reply to User_1's reply
-Thought: I have User_1's reply to User_2's response
-...(this User_2 Response/User_1 Response can repeat 8 times)
+Thought: I have User_1's reply to User_2's reponse
+...(this User_2 Response/User_1 can repeat 8 times)
+
 
 Thought: I now have the conversation 
 Final Conversation: the final conversation based on user_1 and user_2
-`;
 
-export const SUFFIX = `Begin! Remember to have the personalities of each user in mind when giving your final conversation.
+Begin! Remember to have the personalities of each user in mind when giving your final conversation.
+
 
 Users: {input}
-Thought:`;
+`
+export const instructionsTemplate = new PromptTemplate({
+    inputVariables: ["tools", "tool_names", "input"],
+    template: template,
+});

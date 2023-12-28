@@ -21,23 +21,13 @@ import {
     DynamicTool,
 } from 'langchain/tools';
 
-const apikey = "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"
+import { instructionsTemplate } from './templates.js';
+
+const apikey = "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"
 const model = new ChatOpenAI({ temperature: 0.9, openAIApiKey: apikey }).bind({
     stop: ["\nObservation"],
 });;
 
-// class SearchTool extends StructuredTool {
-//     constructor() {
-//         super({
-//             name: 'Search',
-//             func: async (input) => {
-//                 // Implement search functionality here, using SerpAPI for example
-//                 return await search(input);
-//             },
-//             description: 'Useful for when you need to present a conversation topic on current events'
-//         });
-//     }
-// }
 
 // Define tools
 const serpAPITool = new SerpAPI("af50c8c9e2d408b3256e8a1c316da119da0c4e16dcf05e07a560181de5f4f951")
@@ -49,8 +39,8 @@ const searchTool = new DynamicTool({
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
         };
-        const q = `https://serpapi.com/search?engine=duckduckgo`;
-        // https://serpapi.com/search?engine=duckduckgo
+        const q = `https://api.duckduckgo.com/?q=${query}&format=json`;
+        // const q = "https://serpapi.com/search?engine=duckduckgo";
         const res = await fetch(q, settings)
             .then(function (response) {
                 return response.json()
@@ -59,15 +49,13 @@ const searchTool = new DynamicTool({
     },
 });
 
-const tools = [
+export const tools = [
     searchTool,
     serpAPITool,
-
 ];
 
 // Create documents for FAISS vector store
 const docs = tools.map((tool, index) => new Document({ pageContent: tool.description, metadata: { index } }));
-
 
 
 // Initialize FaissStore with documents and embeddings
@@ -198,7 +186,6 @@ function customOutputParser(message) {
     }
 }
 
-
 // const runnable = RunnableSequence.from([
 //     {
 //         input: (values) => values.input,
@@ -215,26 +202,28 @@ function customOutputParser(message) {
 //     verbose: true,
 // });
 
+const input = `User_1: Office worker that loves to play video games, on his days off he enjoys watching anime
+User_2: Teacher that loves to do art in free time. Always up to date on politics`
+
+const instruction = instructionsTemplate.format({
+    tools: tools,
+    tool_names: tools.map((tool) => tool.name).join(",\n"),
+    input: input,
+});
 const agent = await OpenAIAssistantRunnable.createAssistant({
     clientOptions: { apiKey: apikey },
     model: "gpt-3.5-turbo-1106",
-    instructions:
-        "Given the two user's data that includes interests and traits, find a current discussion topic and create a 16 sentense discussion between the two users using realistic emotional language. These are the tools available to you",
-
+    // instructions: instruction,
+    instructions: "Given the two user's data that includes interests and traits, find a current discussion topic and create a 16 sentense discussion between the two users using realistic emotional language. These are the tools available to you",
     name: "Conversation Generator",
     tools,
     asAgent: true,
-    verbose: true,
-    formatMessages,
-    // customOutputParser
 });
 const agentExecutor = AgentExecutor.fromAgentAndTools({
     agent,
     tools,
 });
 
-const input = `User_1: Office worker that loves to play video games, on his days off he enjoys watching anime
-User_2: Teacher that loves to do art in free time. Always up to date on politics`
 const result = await agentExecutor.invoke({ content: input, });
 console.log(result);
 
