@@ -21,9 +21,9 @@ import {
     DynamicTool,
 } from 'langchain/tools';
 
+import { apikey } from './apikeys.js';
 import { instructionsTemplate } from './templates.js';
 
-const apikey = "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"
 const model = new ChatOpenAI({ temperature: 0.9, openAIApiKey: apikey }).bind({
     stop: ["\nObservation"],
 });;
