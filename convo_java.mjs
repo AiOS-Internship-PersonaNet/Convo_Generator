@@ -39,8 +39,8 @@ const searchTool = new DynamicTool({
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
         };
-        const q = `https://api.duckduckgo.com/?q=${query}&format=json`;
-        // const q = "https://serpapi.com/search?engine=duckduckgo";
+        // const q = `https://api.duckduckgo.com/?q=${query}&format=json`;
+        const q = "https://serpapi.com/search?engine=duckduckgo";
         const res = await fetch(q, settings)
             .then(function (response) {
                 return response.json()
@@ -202,8 +202,8 @@ function customOutputParser(message) {
 //     verbose: true,
 // });
 
-const input = `User_1: Office worker that loves to play video games, on his days off he enjoys watching anime
-User_2: Teacher that loves to do art in free time. Always up to date on politics`
+const input = `User_1: Office worker that loves sports, and watching them.
+User_2: Teacher that loves art and painting.`
 
 const instruction = instructionsTemplate.format({
     tools: tools,
