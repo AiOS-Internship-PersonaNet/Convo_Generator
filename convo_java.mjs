@@ -18,7 +18,6 @@ import {
     AIPluginTool,
 } from 'langchain/tools';
 
-const apikey = "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"
 const model = new ChatOpenAI({ temperature: 0.9, openAIApiKey: apikey }).bind({
     stop: ["\nObservation"],
 });;
@@ -52,7 +51,6 @@ await AIPluginTool.fromPluginUrl(
 const docs = tools.map((tool, index) => new Document({ pageContent: tool.description, metadata: { index } }));
 
 
-
 // Initialize FaissStore with documents and embeddings
 const vectorStore = new FaissStore(new OpenAIEmbeddings({ openAIApiKey: apikey }), {});
 // await vectorStore.addDocuments(docs);
@@ -66,7 +64,8 @@ async function getTools(query) {
 // Initialize the components
 
 const PREFIX = `Given the two user's data that includes interests and traits, find a current discussion topic and create a 16 sentence discussion between the two users using realistic emotional language. These are the tools available to you:
-{tools}`;
+{tools}
+`;
 
 const TOOL_INSTRUCTIONS_TEMPLATE = `Use the following format:
 
@@ -88,8 +87,7 @@ Thought: I now have the conversation
 Final Conversation: the final conversation based on user_1 and user_2
 `;
 
-const SUFFIX = `Begin! Remember to have the personalities of each user in mind when giving your final conversation.
-
+const SUFFIX = `Create a 16-sentence engaging conversation script between two laid-back and relaxed users discussing a specific topic. Ensure that the dialogue is dramatized and realistic, with authentic language reflecting the personas of both participants.
 Users: {input}
 Thought:`;
 async function formatMessages(
@@ -144,33 +142,6 @@ async function formatMessages(
     return [new HumanMessage(formatted)];
 }
 
-// function customOutputParser(message) {
-//     // Implement the logic for parsing LLM output
-//     const llmOutput = message.content;
-//     const observationMatch = llmOutput.match(/Observation:(.*)/s);
-//     if (observationMatch) {
-//         return new AgentStep({
-//             returnValues: { output: observationMatch[1].trim() },
-//             log: llmOutput
-//         });
-//     }
-
-//     const finalConversationMatch = llmOutput.match(/Final Conversation:(.*)/s);
-//     if (finalConversationMatch) {
-//         return new AgentStep({
-//             returnValues: { output: finalConversationMatch[1].trim() },
-//             log: llmOutput
-//         });
-//     }
-
-//     const actionMatch = llmOutput.match(/Action\s*:(.*?)\nAction\s*Input\s*:(.*)/s);
-//     if (actionMatch) {
-//         this.lastAction = actionMatch[1].trim();
-//         this.lastActionInput = actionMatch[2].trim();
-//         return new AgentStep({ tool: this.lastAction, toolInput: this.lastActionInput, log: llmOutput });
-//     }
-
-// }
 function customOutputParser(message) {
     const text = message.content;
     if (typeof text !== "string") {
