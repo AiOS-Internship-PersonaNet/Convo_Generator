@@ -16,36 +16,42 @@ import {
     RequestsGetTool,
     RequestsPostTool,
     AIPluginTool,
+    DynamicTool,
 } from 'langchain/tools';
-
+import { apikey } from './apikey.js';
 const model = new ChatOpenAI({ temperature: 0.9, openAIApiKey: apikey }).bind({
     stop: ["\nObservation"],
 });;
 
-class SearchTool extends StructuredTool {
-    constructor() {
-        super({
-            name: 'Search',
-            func: async (input) => {
-                // Implement search functionality here, using SerpAPI for example
-                return await search(input);
-            },
-            description: 'Useful for when you need to present a conversation topic on current events'
-        });
-    }
-}
+const searchTool = new DynamicTool({
+    name: "duckduckgo api tool",
+    description: "Tool for getting the latest information from duckduckgo api",
+    func: async (query) => {
+        const settings = {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        };
+        const q = `https://api.duckduckgo.com/?q=${query}&format=json`;
+        // const q = "https://serpapi.com/search?engine=duckduckgo";
+        const res = await fetch(q, settings)
+            .then(function (response) {
+                return response.json()
+            }).catch(console.log)
+        return res;
+    },
+});
 
-// Initialize SerpAPI tool
-// const search = new SerpAPI();
-const searchTool = new SearchTool();
 // const braveSearchTool = new BraveSearchParams()
 const tool = new WikipediaQueryRun()
 // Define tools
-const tools = [new RequestsGetTool(),
-new RequestsPostTool(),
-await AIPluginTool.fromPluginUrl(
-    "https://www.klarna.com/.well-known/ai-plugin.json"
-),];
+const tools = [
+    new RequestsGetTool(),
+    new RequestsPostTool(),
+    await AIPluginTool.fromPluginUrl(
+        "https://www.klarna.com/.well-known/ai-plugin.json"
+    ),
+    searchTool,
+];
 
 // Create documents for FAISS vector store
 const docs = tools.map((tool, index) => new Document({ pageContent: tool.description, metadata: { index } }));
@@ -87,9 +93,17 @@ Thought: I now have the conversation
 Final Conversation: the final conversation based on user_1 and user_2
 `;
 
-const SUFFIX = `Create a 16-sentence engaging conversation script between two laid-back and relaxed users discussing a specific topic. Ensure that the dialogue is dramatized and realistic, with authentic language reflecting the personas of both participants.
+const SUFFIX = `Begin! Remember to have the personalities of each user in mind when giving your final conversation.
 Users: {input}
 Thought:`;
+// const SUFFIX = `Create a 16-sentence engaging conversation script between two laid-back and relaxed users discussing a specific topic. Ensure that the dialogue is dramatized and realistic, with authentic language reflecting the personas of both participants.
+// Users: {input}
+// Thought:`;
+// const SUFFIX = `Create a fast paced , witty , 
+// dynamic and engaging 12 sentence conversation for entertainment viewing based on the both distinct user personas that is centered around a current news topic searched 
+// from the tools available introducing detailed aspects of interests and personalities from the both personas into the conversation.
+// Users: {input}
+// Thought:`;
 async function formatMessages(
     values
 ) {
@@ -202,30 +216,4 @@ const executor = new AgentExecutor({
 const input = `User_1: Office worker that loves to play video games, on his days off he enjoys watching anime
 User_2: Teacher that loves to do art in free time. Always up to date on politics`
 const result = await executor.invoke({ input });
-
-// Define the agent
-// const llmChain = new LLMChain({ model, prompt: TOOL_INSTRUCTIONS_TEMPLATE, customOutputParser, formatMessages });
-
-// const agent = new LLMSingleActionAgent({
-//     llmChain: llmChain,
-//     stop: ["\nObservation:"],
-//     // promptTemplate: promptTemplate,
-//     tools: tools
-// });
-
-// // Run the agent executor
-// async function runAgentExecutor(user1, user2) {
-//     const intermediateSteps = [];
-//     const agentExecutor = new AgentExecutor({
-//         agent: agent,
-//         tools,
-//         handleParsingErrors: true,
-//         verbose: true
-//     });
-
-//     const conversation = await agentExecutor.invoke({ input });
-//     console.log(conversation);
-// }
-
-// // Example usage
-// runAgentExecutor("User1", "User2");
+console.log(result)
