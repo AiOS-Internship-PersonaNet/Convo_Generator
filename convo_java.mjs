@@ -26,23 +26,23 @@ const model = new ChatOpenAI({
     stop: ["\nObservation"],
 });;
 
-const searchTool = new DynamicTool({
-    name: "duckduckgo api tool",
-    description: "Tool for getting the latest information from duckduckgo api",
-    func: async (query) => {
-        const settings = {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-        };
-        const q = `https://api.duckduckgo.com/?q=${query}&format=json`;
-        // const q = "https://serpapi.com/search?engine=duckduckgo";
-        const res = await fetch(q, settings)
-            .then(function (response) {
-                return response.json()
-            }).catch(console.log)
-        return res;
-    },
-});
+// const searchTool = new DynamicTool({
+//     name: "duckduckgo api tool",
+//     description: "Tool for getting the latest information from duckduckgo api",
+//     func: async (query) => {
+//         const settings = {
+//             method: 'GET',
+//             headers: { 'Content-Type': 'application/json' },
+//         };
+//         const q = `https://api.duckduckgo.com/?q=${query}&format=json`;
+//         // const q = "https://serpapi.com/search?engine=duckduckgo";
+//         const res = await fetch(q, settings)
+//             .then(function (response) {
+//                 return response.json()
+//             }).catch(console.log)
+//         return res;
+//     },
+// });
 
 // const braveSearchTool = new BraveSearchParams()
 // Define tools
@@ -52,7 +52,7 @@ const tools = [
     await AIPluginTool.fromPluginUrl(
         "https://www.klarna.com/.well-known/ai-plugin.json"
     ),
-    searchTool,
+    // searchTool,
 ];
 
 // Create documents for FAISS vector store
