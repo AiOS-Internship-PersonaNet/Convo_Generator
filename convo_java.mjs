@@ -10,16 +10,19 @@ import { RunnableSequence } from "langchain/schema/runnable";
 import {
     HumanMessage,
 } from "langchain/schema";
-import { StructuredTool } from 'langchain/tools';
 import {
-    WikipediaQueryRun,
     RequestsGetTool,
     RequestsPostTool,
     AIPluginTool,
     DynamicTool,
 } from 'langchain/tools';
 import { apikey } from './apikey.js';
-const model = new ChatOpenAI({ temperature: 0.9, openAIApiKey: apikey }).bind({
+const model = new ChatOpenAI({
+    temperature: 0.9,
+    openAIApiKey: apikey,
+    // CHANGE MODEL HERE
+    modelName: "gpt-4-1106-preview",
+}).bind({
     stop: ["\nObservation"],
 });;
 
@@ -42,7 +45,6 @@ const searchTool = new DynamicTool({
 });
 
 // const braveSearchTool = new BraveSearchParams()
-const tool = new WikipediaQueryRun()
 // Define tools
 const tools = [
     new RequestsGetTool(),
@@ -93,17 +95,20 @@ Thought: I now have the conversation
 Final Conversation: the final conversation based on user_1 and user_2
 `;
 
-const SUFFIX = `Begin! Remember to have the personalities of each user in mind when giving your final conversation.
-Users: {input}
-Thought:`;
+/*
+CHANGE PROMPT SUFFIX HERE
+*/
+// const SUFFIX = `Begin! Remember to have the personalities of each user in mind when giving your final conversation.
+// Users: {input}
+// Thought:`;
 // const SUFFIX = `Create a 16-sentence engaging conversation script between two laid-back and relaxed users discussing a specific topic. Ensure that the dialogue is dramatized and realistic, with authentic language reflecting the personas of both participants.
 // Users: {input}
 // Thought:`;
-// const SUFFIX = `Create a fast paced , witty , 
-// dynamic and engaging 12 sentence conversation for entertainment viewing based on the both distinct user personas that is centered around a current news topic searched 
-// from the tools available introducing detailed aspects of interests and personalities from the both personas into the conversation.
-// Users: {input}
-// Thought:`;
+const SUFFIX = `Create a fast paced , witty , 
+dynamic and engaging 12 sentence conversation for entertainment viewing based on the both distinct user personas that is centered around a current news topic searched 
+from the tools available introducing detailed aspects of interests and personalities from the both personas into the conversation.
+Users: {input}
+Thought:`;
 async function formatMessages(
     values
 ) {
